@@ -9,8 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 #model setup 
-llm = ChatMistralAI(model = "mistral-small-2506",temperature=0,max_retries=6,  # Automatically backs off and retries on 503/429 errors
-    timeout=60,)
+llm = ChatMistralAI(model = "mistral-small-2506",temperature=0,max_retries=6, timeout=60)
 
 
 #1st agent 
