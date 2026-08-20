@@ -54,8 +54,9 @@ The research lifecycle processes data across two specialized agent loops and two
         │  (Interactive / Export) │         │      (Pipeline.py)      │
         └─────────────────────────┘         └─────────────────────────┘
 ```
-```text
+
 ## **📁Repository Structure**
+```text
 ├── tools.py            # Custom tool definitions (Tavily search & BeautifulSoup scraper)
 ├── Agents.py           # Agent constructors (Search & Reader) and LCEL chains (Writer & Critic)
 ├── Pipeline.py         # Terminal CLI research orchestration pipeline
