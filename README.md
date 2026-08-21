@@ -1,4 +1,4 @@
-## 🔬 ResearchMind · Autonomous Multi-Agent AI Research System
+# 🔬 ResearchMind · Autonomous Multi-Agent AI Research System
 
 ResearchMind is an automated multi-stage research engine built with **LangChain**, **Mistral AI (`mistral-small-2506`)**, **Tavily AI Search**, and **BeautifulSoup4**. The system features both an interactive, dark-themed **Streamlit** dashboard and a standalone terminal execution pipeline (`Pipeline.py`).
 
