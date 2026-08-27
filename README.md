@@ -62,6 +62,9 @@ An autonomous multi-agent research architecture built with **LangChain**, **Mist
 ## 📂 Repository Structure
 
 ```text
+├── docs/
+|   └── DECISIONS.md    # Architectural Decisions & Technical Trade-Offs
+|
 ├── .env.example        # Template for API keys (MISTRAL_API_KEY, TAVILY_API_KEY)
 ├── .gitignore          # Git exclusion rules for virtual environments & credentials
 ├── Agents.py           # Multi-agent definitions, chains, and LLM orchestration
