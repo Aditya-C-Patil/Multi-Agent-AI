@@ -1,74 +1,60 @@
-from Agents import build_reader_agent , build_search_agent , writer_chain , critic_chain
+import time
+from Agents import build_reader_agent, build_search_agent, critic_chain, writer_chain
 
-def run_research_pipeline(topic : str) -> dict:
 
-    state = {}
+def run_research_pipeline(topic: str) -> dict:
+    if not topic or not topic.strip():
+        raise ValueError("Topic cannot be empty.")
 
-    #search agent working 
-    print("\n"+" ="*50)
-    print("step 1 - search agent is working ...")
-    print("="*50)
+    t0 = time.time()
+    state = {"topic": topic.strip(), "steps": {}}
 
+    # Step 1: Search Agent
+    print(f"\n{'='*50}\nStep 1: Search Agent Investigating...\n{'='*50}")
     search_agent = build_search_agent()
-    search_result = search_agent.invoke({
-        "messages" : [("user", f"Find recent, reliable and detailed information about: {topic}")]
+    search_res = search_agent.invoke({
+        "messages": [("user", f"Find recent, authoritative technical information and key sources about: {topic}")]
     })
-    state["search_results"] = search_result['messages'][-1].content
+    state["search_results"] = search_res["messages"][-1].content
+    state["steps"]["search"] = "completed"
 
-    print("\n search result ",state['search_results'])
-
-    #step 2 - reader agent 
-    print("\n"+" ="*50)
-    print("step 2 - Reader agent is scraping top resources ...")
-    print("="*50)
-
+    # Step 2: Reader Agent
+    print(f"\n{'='*50}\nStep 2: Reader Agent Scraping Primary Source...\n{'='*50}")
     reader_agent = build_reader_agent()
-    reader_result = reader_agent.invoke({
-        "messages": [("user",
-            f"Based on the following search results about '{topic}', "
-            f"pick the most relevant URL and scrape it for deeper content.\n\n"
-            f"Search Results:\n{state['search_results'][:800]}"
+    reader_res = reader_agent.invoke({
+        "messages": [(
+            "user",
+            f"From these search results on '{topic}', identify the most authoritative URL and scrape it for full technical depth:\n\n"
+            f"{state['search_results'][:1200]}",
         )]
     })
+    state["scraped_content"] = reader_res["messages"][-1].content
+    state["steps"]["reader"] = "completed"
 
-    state['scraped_content'] = reader_result['messages'][-1].content
-
-    print("\nscraped content: \n", state['scraped_content'])
-
-    #step 3 - writer chain 
-
-    print("\n"+" ="*50)
-    print("step 3 - Writer is drafting the report ...")
-    print("="*50)
-
+    # Step 3: Writer Chain
+    print(f"\n{'='*50}\nStep 3: Writer Drafting Research Synthesis...\n{'='*50}")
     research_combined = (
-        f"SEARCH RESULTS : \n {state['search_results']} \n\n"
-        f"DETAILED SCRAPED CONTENT : \n {state['scraped_content']}"
+        f"SEARCH SNIPPETS & SOURCES:\n{state['search_results']}\n\n"
+        f"DEEP SCRAPED CONTENT:\n{state['scraped_content']}"
     )
-
     state["report"] = writer_chain.invoke({
-        "topic" : topic,
-        "research" : research_combined
+        "topic": topic,
+        "research": research_combined,
     })
+    state["steps"]["writer"] = "completed"
 
-    print("\n Final Report\n",state['report'])
+    # Step 4: Critic Chain
+    print(f"\n{'='*50}\nStep 4: Critic Reviewing Report Quality...\n{'='*50}")
+    state["feedback"] = critic_chain.invoke({"report": state["report"]})
+    state["steps"]["critic"] = "completed"
 
-    #critic report 
-
-    print("\n"+" ="*50)
-    print("step 4 - critic is reviewing the report ")
-    print("="*50)
-
-    state["feedback"] = critic_chain.invoke({
-        "report":state['report']
-    })
-
-    print("\n critic report \n", state['feedback'])
-
+    state["elapsed_time"] = round(time.time() - t0, 2)
     return state
 
 
-
 if __name__ == "__main__":
-    topic = input("\n Enter a research topic : ")
-    run_research_pipeline(topic)
+    user_topic = input("\nEnter research topic: ").strip()
+    if user_topic:
+        res = run_research_pipeline(user_topic)
+        print("\n--- FINAL REPORT ---\n", res["report"])
+        print("\n--- CRITIC REVIEW ---\n", res["feedback"])
