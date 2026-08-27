@@ -1,508 +1,405 @@
-import streamlit as st
 import time
-from Agents import build_reader_agent, build_search_agent, writer_chain, critic_chain
+import streamlit as st
+from Agents import build_reader_agent, build_search_agent, critic_chain, writer_chain
 
-# ── Page config ──────────────────────────────────────────────────────────────
+# ─── Page Configuration ───────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="ResearchMind · AI Research Agent",
+    page_title="ResearchMind // Autonomous Agent Swarm",
     page_icon="🔬",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
-st.markdown("""
+# ─── Dark Amber & Cyberpunk Aesthetic ─────────────────────────────────────────
+st.markdown(
+    """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* ── Reset & base ── */
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-    color: #e8e4dc;
+:root {
+    --bg: #07090e;
+    --surface: rgba(18, 22, 34, 0.65);
+    --border: rgba(255, 140, 50, 0.2);
+    --border-glow: rgba(255, 140, 50, 0.55);
+    --amber: #ff8c32;
+    --amber-bright: #ffa756;
+    --emerald: #10b981;
+    --text-high: #f8fafc;
+    --text-mid: #94a3b8;
+    --text-muted: #64748b;
 }
+
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
+h1, h2, h3, .brand-title { font-family: 'Space Grotesk', sans-serif !important; letter-spacing: -0.02em; }
+code, pre, .mono { font-family: 'JetBrains Mono', monospace !important; }
 
 .stApp {
-    background: #0a0a0f;
-    background-image:
-        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(255,140,50,0.12) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(255,80,30,0.08) 0%, transparent 55%);
+    background-color: var(--bg) !important;
+    color: var(--text-high) !important;
 }
 
-/* ── Hide default streamlit chrome ── */
-#MainMenu, footer, header { visibility: hidden; }
-.block-container { padding: 2rem 3rem 4rem; max-width: 1200px; }
+/* Ambient Radial Lighting */
+.stApp::before {
+    content: '';
+    position: fixed;
+    top: -50%; left: -50%; width: 200%; height: 200%;
+    background: radial-gradient(circle at 80% 15%, rgba(255, 140, 50, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 15% 85%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
+    pointer-events: none; z-index: 0;
+}
 
-/* ── Hero header ── */
-.hero {
-    text-align: center;
-    padding: 3.5rem 0 2.5rem;
-    position: relative;
+/* Glassmorphism Card */
+.glass-card {
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 1.6rem 2rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.hero-eyebrow {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.7rem;
-    font-weight: 500;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    color: #ff8c32;
-    margin-bottom: 1rem;
-    opacity: 0.9;
+.glass-card:hover {
+    border-color: var(--border-glow);
+    box-shadow: 0 14px 40px -10px rgba(255, 140, 50, 0.22);
 }
-.hero h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(2.8rem, 6vw, 5rem);
+
+.hero-title {
+    background: linear-gradient(135deg, #ffffff 0%, #fed7aa 40%, var(--amber) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: clamp(2.4rem, 4.5vw, 3.6rem);
     font-weight: 800;
-    line-height: 1.0;
+    line-height: 1.05;
     letter-spacing: -0.03em;
-    color: #f0ebe0;
-    margin: 0 0 1rem;
-}
-.hero h1 span {
-    color: #ff8c32;
-}
-.hero-sub {
-    font-size: 1.05rem;
-    font-weight: 300;
-    color: #a09890;
-    max-width: 520px;
-    margin: 0 auto;
-    line-height: 1.65;
+    margin-bottom: 0.3rem;
 }
 
-/* ── Divider ── */
-.divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,140,50,0.3), transparent);
-    margin: 2rem 0;
+.hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.5rem;
 }
 
-/* ── Input card ── */
-.input-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,140,50,0.15);
-    border-radius: 16px;
-    padding: 2rem 2.5rem;
-    margin-bottom: 2rem;
-    backdrop-filter: blur(8px);
-}
-
-/* ── Streamlit input overrides ── */
-.stTextInput > div > div > input {
-    background: rgba(255,255,255,0.05) !important;
-    border: 1px solid rgba(255,140,50,0.25) !important;
-    border-radius: 10px !important;
-    color: #f0ebe0 !important;
-    font-family: 'DM Sans', sans-serif !important;
-    font-size: 1rem !important;
-    padding: 0.75rem 1rem !important;
-    transition: border-color 0.2s, box-shadow 0.2s !important;
-}
-.stTextInput > div > div > input:focus {
-    border-color: #ff8c32 !important;
-    box-shadow: 0 0 0 3px rgba(255,140,50,0.12) !important;
-}
-.stTextInput > label {
-    font-family: 'DM Mono', monospace !important;
-    font-size: 0.72rem !important;
-    letter-spacing: 0.15em !important;
-    text-transform: uppercase !important;
-    color: #ff8c32 !important;
-    font-weight: 500 !important;
-}
-
-/* ── Button ── */
-.stButton > button {
-    background: linear-gradient(135deg, #ff8c32 0%, #ff5a1a 100%) !important;
-    color: #0a0a0f !important;
-    font-family: 'Syne', sans-serif !important;
-    font-weight: 700 !important;
-    font-size: 0.95rem !important;
-    letter-spacing: 0.04em !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 0.7rem 2.2rem !important;
-    cursor: pointer !important;
-    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s !important;
-    box-shadow: 0 4px 20px rgba(255,140,50,0.3) !important;
-    width: 100%;
-}
-.stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 28px rgba(255,140,50,0.4) !important;
-    opacity: 0.95 !important;
-}
-.stButton > button:active {
-    transform: translateY(0) !important;
-}
-
-/* ── Pipeline step cards ── */
+/* Custom Step Card */
 .step-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 14px;
-    padding: 1.5rem 1.8rem;
-    margin-bottom: 1.2rem;
+    padding: 1.1rem 1.4rem;
+    margin-bottom: 0.85rem;
     position: relative;
-    overflow: hidden;
-    transition: border-color 0.3s;
+    transition: all 0.3s ease;
 }
 .step-card.active {
-    border-color: rgba(255,140,50,0.4);
-    background: rgba(255,140,50,0.04);
+    border-color: var(--border-glow);
+    background: rgba(255, 140, 50, 0.06);
+    box-shadow: 0 0 20px rgba(255, 140, 50, 0.15);
 }
 .step-card.done {
-    border-color: rgba(80,200,120,0.3);
-    background: rgba(80,200,120,0.03);
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.04);
 }
 .step-card::before {
     content: '';
     position: absolute;
     left: 0; top: 0; bottom: 0;
-    width: 3px;
+    width: 3.5px;
     border-radius: 14px 0 0 14px;
-    background: rgba(255,255,255,0.05);
-    transition: background 0.3s;
+    background: rgba(255, 255, 255, 0.08);
 }
-.step-card.active::before { background: #ff8c32; }
-.step-card.done::before   { background: #50c878; }
+.step-card.active::before { background: var(--amber); }
+.step-card.done::before   { background: var(--emerald); }
 
 .step-header {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
-    margin-bottom: 0.3rem;
+    justify-content: space-between;
 }
 .step-num {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.68rem;
-    font-weight: 500;
-    letter-spacing: 0.15em;
-    color: #ff8c32;
-    opacity: 0.7;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--amber);
+    font-weight: 700;
 }
 .step-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 0.95rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.92rem;
     font-weight: 700;
-    color: #f0ebe0;
+    color: var(--text-high);
 }
 .step-status {
-    margin-left: auto;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-}
-.status-waiting  { color: #555; }
-.status-running  { color: #ff8c32; }
-.status-done     { color: #50c878; }
-
-/* ── Result panels ── */
-.result-panel {
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 14px;
-    padding: 1.8rem 2rem;
-    margin-top: 1rem;
-    margin-bottom: 1.5rem;
-}
-.result-panel-title {
-    font-family: 'DM Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 0.7rem;
-    font-weight: 500;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: #ff8c32;
-    margin-bottom: 1rem;
-    padding-bottom: 0.7rem;
-    border-bottom: 1px solid rgba(255,140,50,0.15);
-}
-.result-content {
-    font-size: 0.92rem;
-    line-height: 1.8;
-    color: #cdc8bf;
-    white-space: pre-wrap;
-    font-family: 'DM Sans', sans-serif;
-}
-
-/* ── Report & feedback panels ── */
-.report-panel {
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,140,50,0.2);
-    border-radius: 16px;
-    padding: 2rem 2.5rem;
-    margin-top: 1rem;
-}
-.feedback-panel {
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(80,200,120,0.2);
-    border-radius: 16px;
-    padding: 2rem 2.5rem;
-    margin-top: 1rem;
-}
-.panel-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-bottom: 1.2rem;
-    padding-bottom: 0.7rem;
-}
-.panel-label.orange {
-    color: #ff8c32;
-    border-bottom: 1px solid rgba(255,140,50,0.15);
-}
-.panel-label.green {
-    color: #50c878;
-    border-bottom: 1px solid rgba(80,200,120,0.15);
-}
-
-/* ── Progress text ── */
-.stSpinner > div { color: #ff8c32 !important; }
-
-/* ── Expander ── */
-details summary {
-    font-family: 'DM Mono', monospace !important;
-    font-size: 0.75rem !important;
-    color: #a09890 !important;
-    letter-spacing: 0.1em !important;
-    cursor: pointer;
-}
-
-/* ── Section heading ── */
-.section-heading {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.3rem;
     font-weight: 700;
-    color: #f0ebe0;
-    margin: 2rem 0 1rem;
+    letter-spacing: 0.08em;
 }
 
-/* ── Toast-style notice ── */
-.notice {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    color: #605850;
+/* Interactive Action Buttons */
+.stButton > button {
+    background: linear-gradient(135deg, #ff8c32 0%, #ea580c 100%) !important;
+    color: #000000 !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 800 !important;
+    font-size: 0.95rem !important;
+    border-radius: 12px !important;
+    border: none !important;
+    padding: 0.75rem 2rem !important;
+    letter-spacing: 0.04em !important;
+    transition: all 0.25s ease !important;
+    box-shadow: 0 4px 20px rgba(255, 140, 50, 0.35) !important;
+}
+.stButton > button:hover {
+    transform: translateY(-2px) scale(1.01) !important;
+    box-shadow: 0 8px 30px rgba(255, 140, 50, 0.55) !important;
+}
+
+/* Metric Display Strip */
+.stat-pill {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.75rem 1.2rem;
     text-align: center;
-    margin-top: 3rem;
+}
+.stat-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    color: #ffffff;
+}
+.stat-label {
+    font-size: 0.7rem;
+    color: var(--text-mid);
+    text-transform: uppercase;
     letter-spacing: 0.08em;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
-# ── Helper: render a step card ────────────────────────────────────────────────
-def step_card(num: str, title: str, state: str, desc: str = ""):
+# ─── Helper Functions & Callbacks ─────────────────────────────────────────────
+def render_step_card(num: str, title: str, state: str, desc: str = ""):
     status_map = {
-        "waiting": ("WAITING", "status-waiting"),
-        "running": ("● RUNNING", "status-running"),
-        "done":    ("✓ DONE",   "status-done"),
+        "waiting": ("WAITING", "#52525b"),
+        "running": ("● RUNNING", "#ff8c32"),
+        "done": ("✓ COMPLETED", "#10b981"),
     }
-    label, cls = status_map.get(state, ("", ""))
-    card_cls = {"running": "active", "done": "done"}.get(state, "")
-    st.markdown(f"""
-    <div class="step-card {card_cls}">
+    label, color = status_map.get(state, ("WAITING", "#52525b"))
+    st.markdown(
+        f"""
+    <div class="step-card {state}">
         <div class="step-header">
-            <span class="step-num">{num}</span>
-            <span class="step-title">{title}</span>
-            <span class="step-status {cls}">{label}</span>
+            <div>
+                <span class="step-num">{num}</span>&nbsp;&nbsp;
+                <span class="step-title">{title}</span>
+            </div>
+            <span class="step-status" style="color:{color};">{label}</span>
         </div>
-        {"<div style='font-size:0.82rem;color:#706860;margin-top:0.3rem;'>"+desc+"</div>" if desc else ""}
+        {"<div style='font-size:0.78rem; color:#808b96; margin-top:0.35rem;'>"+desc+"</div>" if desc else ""}
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
-# ── Session state init ────────────────────────────────────────────────────────
-for key in ("results", "running", "done"):
-    if key not in st.session_state:
-        st.session_state[key] = {} if key == "results" else False
+def select_suggested_topic(topic_text: str):
+    st.session_state["topic_field"] = topic_text
 
 
-# ── Hero ──────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="hero">
-    <div class="hero-eyebrow">Multi-Agent AI System</div>
-    <h1>Research<span>Mind</span></h1>
-    <p class="hero-sub">
-        Four specialized AI agents collaborate — searching, scraping, writing,
-        and critiquing — to deliver a polished research report on any topic.
-    </p>
-</div>
-<div class="divider"></div>
-""", unsafe_allow_html=True)
+# ─── Session State Initialization ─────────────────────────────────────────────
+if "topic_field" not in st.session_state:
+    st.session_state["topic_field"] = ""
+if "results" not in st.session_state:
+    st.session_state.results = None
+if "active_step" not in st.session_state:
+    st.session_state.active_step = "waiting"
 
+# ─── Hero Banner ──────────────────────────────────────────────────────────────
+st.markdown('<div class="hero-eyebrow">⚡ MULTI-AGENT INTELLIGENCE MATRIX</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">ResearchMind OS</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div style="color:var(--text-mid); font-size:1rem; max-width:650px; margin-bottom:2rem; line-height:1.6;">'
+    "Four specialized autonomous agents collaborate in a sequential cognitive pipeline to discover, scrape, "
+    "synthesize, and rigorously peer-review technical research."
+    "</div>",
+    unsafe_allow_html=True,
+)
 
-# ── Layout: input left, pipeline right ───────────────────────────────────────
-col_input, col_spacer, col_pipeline = st.columns([5, 0.5, 4])
+# ─── Main Interface Grid ──────────────────────────────────────────────────────
+col_input, col_pipeline = st.columns([5, 4], gap="large")
 
 with col_input:
-    st.markdown('<div class="input-card">', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     topic = st.text_input(
-        "Research Topic",
-        placeholder="e.g. Quantum computing breakthroughs in 2025",
-        key="topic_input",
-        label_visibility="visible",
+        "Research Directive or Technical Query",
+        placeholder="e.g. Post-Quantum Cryptography implementations & NIST standards",
+        key="topic_field",
     )
-    run_btn = st.button("⚡  Run Research Pipeline", use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Example chips
-    st.markdown("""
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">
-        <span style="font-family:'DM Mono',monospace;font-size:0.68rem;color:#605850;letter-spacing:0.1em;">TRY →</span>
-    """, unsafe_allow_html=True)
-    examples = ["LLM agents 2025", "CRISPR gene editing", "Fusion energy progress"]
-    for ex in examples:
-        st.markdown(f"""
-        <span style="
-            background:rgba(255,255,255,0.04);
-            border:1px solid rgba(255,255,255,0.08);
-            border-radius:6px;
-            padding:0.25rem 0.7rem;
-            font-size:0.75rem;
-            color:#a09890;
-            font-family:'DM Sans',sans-serif;
-            cursor:default;
-        ">{ex}</span>
-        """, unsafe_allow_html=True)
+    st.write("")
+    run_btn = st.button("🚀 EXECUTE AUTONOMOUS AGENT SWARM", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # Example Topics via safe on_click callbacks
+    st.markdown(
+        """
+    <div style="font-size:0.72rem; color:var(--text-muted); font-family:JetBrains Mono; margin-bottom:0.6rem; letter-spacing:0.1em;">
+        SUGGESTED VECTORS:
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.button(
+            "⚛️ Quantum Computing 2026",
+            use_container_width=True,
+            on_click=select_suggested_topic,
+            args=("Quantum Computing breakthrough implementations 2026",),
+        )
+    with c2:
+        st.button(
+            "🧬 CRISPR Gene Therapies",
+            use_container_width=True,
+            on_click=select_suggested_topic,
+            args=("Recent CRISPR Cas-9 clinical trial results and breakthroughs",),
+        )
+    with c3:
+        st.button(
+            "⚡ Nuclear Fusion Net Gain",
+            use_container_width=True,
+            on_click=select_suggested_topic,
+            args=("Magnetic confinement fusion energy milestones",),
+        )
+
 with col_pipeline:
-    st.markdown('<div class="section-heading">Pipeline</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-family:Space Grotesk; font-size:1.1rem; font-weight:700; color:white; margin-bottom:1rem;">Agent Pipeline Status</div>',
+        unsafe_allow_html=True,
+    )
 
-    r = st.session_state.results
-    done = st.session_state.done
+    current_state = st.session_state.active_step
+    render_step_card("01", "Discovery Agent", "done" if current_state in ["reader", "writer", "critic", "complete"] else ("running" if current_state == "search" else "waiting"), "Queries Tavily Web API for authoritative sources")
+    render_step_card("02", "DOM Extractor Agent", "done" if current_state in ["writer", "critic", "complete"] else ("running" if current_state == "reader" else "waiting"), "Scrapes & parses full-length technical content")
+    render_step_card("03", "Synthesis Writer", "done" if current_state in ["critic", "complete"] else ("running" if current_state == "writer" else "waiting"), "Compiles exhaustive markdown report with citations")
+    render_step_card("04", "Peer Review Critic", "done" if current_state == "complete" else ("running" if current_state == "critic" else "waiting"), "Evaluates factual density, scoring from 1-10")
 
-    def s(step):
-        if not r:
-            return "waiting"
-        steps = ["search", "reader", "writer", "critic"]
-        idx = steps.index(step)
-        completed = list(r.keys())
-        # figure out which steps are done
-        if step in r:
-            return "done"
-        # which step is running now (first not in r)
-        if st.session_state.running:
-            for i, k in enumerate(steps):
-                if k not in r:
-                    return "running" if k == step else "waiting"
-        return "waiting"
-
-    step_card("01", "Search Agent",  s("search"), "Gathers recent web information")
-    step_card("02", "Reader Agent",  s("reader"), "Scrapes & extracts deep content")
-    step_card("03", "Writer Chain",  s("writer"), "Drafts the full research report")
-    step_card("04", "Critic Chain",  s("critic"), "Reviews & scores the report")
-
-
-# ── Run pipeline ──────────────────────────────────────────────────────────────
+# ─── Pipeline Execution Coordinator ───────────────────────────────────────────
 if run_btn:
     if not topic.strip():
-        st.warning("Please enter a research topic first.")
+        st.warning("Please provide a research directive before launching agents.")
     else:
-        st.session_state.results = {}
-        st.session_state.running = True
-        st.session_state.done = False
-        st.rerun()
+        status_box = st.status("⚡ Agents initialized. Processing...", expanded=True)
+        try:
+            t0 = time.time()
 
-if st.session_state.running and not st.session_state.done:
-    results = {}
-    topic_val = st.session_state.topic_input
+            # Step 1: Search Discovery
+            with status_box:
+                st.session_state.active_step = "search"
+                st.write("🔍 **Agent 01 (Discovery)** querying Tavily API for technical literature...")
+                search_agent = build_search_agent()
+                sr = search_agent.invoke({
+                    "messages": [("user", f"Find recent, reliable, and detailed technical information and URLs on: {topic}")]
+                })
+                search_out = sr["messages"][-1].content
 
-    # ── Step 1: Search ──
-    with st.spinner("🔍  Search Agent is working…"):
-        search_agent = build_search_agent()
-        sr = search_agent.invoke({
-            "messages": [("user", f"Find recent, reliable and detailed information about: {topic_val}")]
-        })
-        results["search"] = sr["messages"][-1].content
-        st.session_state.results = dict(results)
-    st.rerun() if False else None   # keep inline for now
+                # Step 2: DOM Reader
+                st.session_state.active_step = "reader"
+                st.write("📄 **Agent 02 (DOM Extractor)** scraping primary technical sources...")
+                reader_agent = build_reader_agent()
+                rr = reader_agent.invoke({
+                    "messages": [(
+                        "user",
+                        f"From these search results on '{topic}', select the most authoritative technical URL and scrape it for full context:\n\n{search_out[:1200]}",
+                    )]
+                })
+                reader_out = rr["messages"][-1].content
 
-    # ── Step 2: Reader ──
-    with st.spinner("📄  Reader Agent is scraping top resources…"):
-        reader_agent = build_reader_agent()
-        rr = reader_agent.invoke({
-            "messages": [("user",
-                f"Based on the following search results about '{topic_val}', "
-                f"pick the most relevant URL and scrape it for deeper content.\n\n"
-                f"Search Results:\n{results['search'][:800]}"
-            )]
-        })
-        results["reader"] = rr["messages"][-1].content
-        st.session_state.results = dict(results)
+                # Step 3: Synthesis Writer
+                st.session_state.active_step = "writer"
+                st.write("✍️ **Agent 03 (Synthesis Writer)** drafting exhaustive research brief...")
+                research_combined = f"SEARCH DISCOVERY:\n{search_out}\n\nSCRAPED DOCUMENTATION:\n{reader_out}"
+                report_out = writer_chain.invoke({"topic": topic, "research": research_combined})
 
-    # ── Step 3: Writer ──
-    with st.spinner("✍️  Writer is drafting the report…"):
-        research_combined = (
-            f"SEARCH RESULTS:\n{results['search']}\n\n"
-            f"DETAILED SCRAPED CONTENT:\n{results['reader']}"
-        )
-        results["writer"] = writer_chain.invoke({
-            "topic": topic_val,
-            "research": research_combined
-        })
-        st.session_state.results = dict(results)
+                # Step 4: Critic Chain
+                st.session_state.active_step = "critic"
+                st.write("🧐 **Agent 04 (Critic)** conducting blind peer review & rubric scoring...")
+                critic_out = critic_chain.invoke({"report": report_out})
 
-    # ── Step 4: Critic ──
-    with st.spinner("🧐  Critic is reviewing the report…"):
-        results["critic"] = critic_chain.invoke({
-            "report": results["writer"]
-        })
-        st.session_state.results = dict(results)
+                elapsed = round(time.time() - t0, 2)
+                st.session_state.active_step = "complete"
+                status_box.update(label=f"✅ Multi-Agent Pipeline Completed in {elapsed}s!", state="complete", expanded=False)
 
-    st.session_state.running = False
-    st.session_state.done = True
-    st.rerun()
+                st.session_state.results = {
+                    "topic": topic,
+                    "search": search_out,
+                    "reader": reader_out,
+                    "report": report_out,
+                    "critic": critic_out,
+                    "word_count": len(report_out.split()),
+                    "elapsed": elapsed,
+                }
+                st.rerun()
 
+        except Exception as e:
+            st.session_state.active_step = "waiting"
+            status_box.update(label=f"❌ Execution Error: {e}", state="error", expanded=True)
+            st.error(str(e))
 
-# ── Results display ───────────────────────────────────────────────────────────
-r = st.session_state.results
+# ─── Results & Intelligence Dashboard ─────────────────────────────────────────
+if st.session_state.results:
+    res = st.session_state.results
+    st.markdown("---")
 
-if r:
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-heading">Results</div>', unsafe_allow_html=True)
+    # Real-Time Telemetry Ribbon
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(f'<div class="stat-pill"><div class="stat-value">{res["word_count"]}</div><div class="stat-label">Words Generated</div></div>', unsafe_allow_html=True)
+    with m2:
+        st.markdown(f'<div class="stat-pill"><div class="stat-value">{res["elapsed"]}s</div><div class="stat-label">Pipeline Latency</div></div>', unsafe_allow_html=True)
+    with m3:
+        st.markdown('<div class="stat-pill"><div class="stat-value" style="color:var(--amber);">4/4</div><div class="stat-label">Agents Coordinated</div></div>', unsafe_allow_html=True)
+    with m4:
+        st.markdown('<div class="stat-pill"><div class="stat-value" style="color:var(--emerald);">REVIEWED</div><div class="stat-label">Critic Verdict</div></div>', unsafe_allow_html=True)
 
-    # Raw outputs in expanders
-    if "search" in r:
-        with st.expander("🔍 Search Results (raw)", expanded=False):
-            st.markdown(f'<div class="result-panel"><div class="result-panel-title">Search Agent Output</div>'
-                        f'<div class="result-content">{r["search"]}</div></div>', unsafe_allow_html=True)
+    st.write("")
 
-    if "reader" in r:
-        with st.expander("📄 Scraped Content (raw)", expanded=False):
-            st.markdown(f'<div class="result-panel"><div class="result-panel-title">Reader Agent Output</div>'
-                        f'<div class="result-content">{r["reader"]}</div></div>', unsafe_allow_html=True)
+    tab_report, tab_critic, tab_scraped, tab_search = st.tabs([
+        "📝 Executive Technical Report",
+        "🧐 Critic Peer Review",
+        "📄 Extracted Web Context",
+        "🔍 Discovery Raw Stream",
+    ])
 
-    # Final report
-    if "writer" in r:
-        st.markdown("""
-        <div class="report-panel">
-            <div class="panel-label orange">📝 Final Research Report</div>
-        """, unsafe_allow_html=True)
-        st.markdown(r["writer"])   # render markdown natively
+    with tab_report:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown(res["report"])
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # Download
         st.download_button(
-            label="⬇  Download Report (.md)",
-            data=r["writer"],
-            file_name=f"research_report_{int(time.time())}.md",
+            label="⬇ Export Master Markdown Brief (.md)",
+            data=res["report"],
+            file_name=f"research_mind_{int(time.time())}.md",
             mime="text/markdown",
+            use_container_width=True,
         )
 
-    # Critic feedback
-    if "critic" in r:
-        st.markdown("""
-        <div class="feedback-panel">
-            <div class="panel-label green">🧐 Critic Feedback</div>
-        """, unsafe_allow_html=True)
-        st.markdown(r["critic"])
+    with tab_critic:
+        st.markdown('<div class="glass-card" style="border-left: 3px solid #10b981;">', unsafe_allow_html=True)
+        st.markdown(res["critic"])
         st.markdown("</div>", unsafe_allow_html=True)
 
+    with tab_scraped:
+        st.text_area("DOM Content (Cleaned & De-noised)", value=res["reader"], height=350, disabled=True)
 
-# ── Footer ────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="notice">
-    ResearchMind · Powered by LangChain multi-agent pipeline · Built with Streamlit
-</div>
-""", unsafe_allow_html=True)
+    with tab_search:
+        st.text_area("Tavily Search Snippets", value=res["search"], height=350, disabled=True)
